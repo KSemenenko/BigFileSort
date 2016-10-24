@@ -29,5 +29,7 @@
 
         <Button Content="Sort File" Grid.Row="3" Grid.Column="1" Margin="5" Command="{Binding SortFileCommand}"/>
 
+        <ProgressBar Value="{Binding Progress}"  Grid.Row="4" Grid.Column="1"/>
+
     </Grid>
 </Window>
