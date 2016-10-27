@@ -1,21 +1,37 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.OleDb;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using BigSort.Model;
+using DirtyMergeSort;
 using MVVMBase;
 
 namespace BigSort.ViewModel
 {
     public class MainViewModel : BaseViewModel
     {
+        public MainViewModel()
+        {
+            var lst1 = new List<object>();
+            var lst2 = new List<object>();
+
+            lst1.Add(1);
+            lst2.Add(1);
+
+            var x = lst1[0] == lst2[0];
+            var y = lst1[0] == lst1[0];
+        }
+
+        
+
         private bool isFileGenerateInProgress = false;
         private object sync = new object();
 
@@ -171,57 +187,25 @@ namespace BigSort.ViewModel
 
         public async Task SortFile(string path)
         {
-            Debug.WriteLine("GenerateFile - Start");
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            Progress = 0;
-            ConcurrentDictionary<string, ConcurrentQueue<LineItem>> indexDictionary = new ConcurrentDictionary<string, ConcurrentQueue<LineItem>>();
+            Sort(@"d:\sorted.txt", @"d:\3gb.txt");
+        }
 
-    
-            //create index
-            Parallel.ForEach(File.ReadLines(path), (line, loopState, index) =>
+        public void Sort(string sortedPath, string dataPath)
+        {
+            File.WriteAllLines(sortedPath,
+                File.ReadLines(dataPath)
+                    .Select(ProgressUpdate("read"))
+                    .Sorted(1000000)
+                    .Select(ProgressUpdate("write")));
+        }
+
+        private Func<string, int, string> ProgressUpdate(string type)
+        {
+            return (x, i) =>
             {
-                if(index > 630)
-                {
-                    var x = 5;
-                }
-
-                var lineParts = line.Split('.');
-                if (lineParts.Length != 2)
-                {
-                    return;
-                }
-                string key = string.Empty;
-                int digit = 0;
-
-                try
-                {
-                    key = lineParts[1].Trim().ToLowerInvariant();
-                    digit = Convert.ToInt32(lineParts[0].Trim());
-                }
-                catch (Exception)
-                {
-                    return;
-                }
-
-
-                var indexList = indexDictionary.GetOrAdd(key, new ConcurrentQueue<LineItem>());
-
-                var lineItem = new LineItem() { LineNumeber = index, Number = digit };
-                indexList.Enqueue(lineItem);
-
-            });
-
-
-            sw.Stop();
-
-            if (!GetFreeSize(path))
-            {
-                MessageBox.Show("Disk if full :(");
-            }
-
-            MessageBox.Show("File ready - size is: " + GeteFileSize(path));
-            Debug.WriteLine("GenerateFile - Stop; Total:" + sw.Elapsed);
+                if (i % 100000 == 0) Debug.WriteLine("{0}: {1}", type, i);
+                return x;
+            };
         }
     }
 }
