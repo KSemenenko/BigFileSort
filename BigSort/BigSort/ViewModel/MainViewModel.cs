@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -18,24 +19,13 @@ namespace BigSort.ViewModel
 {
     public class MainViewModel : BaseViewModel
     {
-        public MainViewModel()
-        {
-            var lst1 = new List<object>();
-            var lst2 = new List<object>();
 
-            lst1.Add(1);
-            lst2.Add(1);
-
-            var x = lst1[0] == lst2[0];
-            var y = lst1[0] == lst1[0];
-        }
-
-        
+        CancellationTokenSource createFileCancellationTokenSource = new CancellationTokenSource();
 
         private bool isFileGenerateInProgress = false;
         private object sync = new object();
 
-        private string filePath;
+        private string filePath = "d:\\data.txt";
 
         public string FilePath
         {
@@ -48,8 +38,20 @@ namespace BigSort.ViewModel
                 OnPropertyChanged(nameof(SortFileCommand));
             }
         }
-        
 
+        private string resultFilePath = "d:\\sorted.txt";
+
+        public string ResultFilePath
+        {
+            get { return resultFilePath; }
+            set
+            {
+                resultFilePath = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CreateFileCommand));
+                OnPropertyChanged(nameof(SortFileCommand));
+            }
+        }
 
         private int fileSize = 2;
 
@@ -64,7 +66,6 @@ namespace BigSort.ViewModel
                 OnPropertyChanged(nameof(SortFileCommand));
             }
         }
-
 
         private int progress;
 
@@ -84,19 +85,22 @@ namespace BigSort.ViewModel
             {
                 return new DelegateCommand(async executedParam =>
                 {
-                    if (isFileGenerateInProgress)
+                    if(isFileGenerateInProgress)
+                    {
+                        createFileCancellationTokenSource?.Cancel();
                         return;
+                    }
+                    
 
                     isFileGenerateInProgress = true;
 
                     OnPropertyChanged(nameof(CreateFileCommand));
 
-                    string path = "d:\\WriteLines.txt";
-                    await GenerateFile(path);
+                    await GenerateFile(FilePath);
+                    createFileCancellationTokenSource = new CancellationTokenSource();
                     isFileGenerateInProgress = false;
-
                 },
-                canExecutedParam => { return !string.IsNullOrEmpty(FilePath) && FileSize > 0 && !isFileGenerateInProgress; });
+                    canExecutedParam => { return !string.IsNullOrEmpty(FilePath) && FileSize > 0; });
             }
         }
 
@@ -106,26 +110,27 @@ namespace BigSort.ViewModel
             {
                 return new DelegateCommand(async executedParam =>
                 {
-                    string path = "d:\\WriteLines.txt";
-                    await SortFile(path);
+                    await SortFile();
                 },
-                canExecutedParam => { return !string.IsNullOrEmpty(FilePath); });
+                    canExecutedParam => { return !string.IsNullOrEmpty(ResultFilePath); });
             }
         }
 
         public int GeteFileSize(string path)
-        {                                                                //KB   //MB   //GB      
-            return Convert.ToInt32(new System.IO.FileInfo(path).Length / 1024 / 1024 / 1024);
+        {
+            //KB   //MB   //GB      
+            return Convert.ToInt32(new System.IO.FileInfo(path).Length/1024/1024/1024);
         }
 
         public int GeteFileSizeMB(string path)
-        {                                                                //KB   //MB        
-            return Convert.ToInt32(new System.IO.FileInfo(path).Length / 1024 / 1024);
+        {
+            //KB   //MB        
+            return Convert.ToInt32(new System.IO.FileInfo(path).Length/1024/1024);
         }
 
         public bool GetFreeSize(string path)
-        {                                                                    
-            DriveInfo driveInfo = new DriveInfo(path.Substring(0,2));
+        {
+            DriveInfo driveInfo = new DriveInfo(path.Substring(0, 2));
             return (driveInfo.AvailableFreeSpace/1024/1024) > 500;
         }
 
@@ -136,15 +141,20 @@ namespace BigSort.ViewModel
             sw.Start();
             int oldSize = -1;
             Progress = 0;
-            using (StreamWriter outputFile = new StreamWriter(path))
+            using(StreamWriter outputFile = new StreamWriter(path))
             {
-                while (GetFreeSize(path) && GeteFileSize(path) < FileSize)
+                while(GetFreeSize(path) && GeteFileSize(path) < FileSize)
                 {
-                    Progress = (FileSize * 1024)  * GeteFileSizeMB(path) / 100;
+                    if(createFileCancellationTokenSource.Token.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
+                    Progress = (FileSize*1024)*GeteFileSizeMB(path)/100;
 
                     StringBuilder sb = new StringBuilder();
                     int lines = 0;
-                    foreach (var item in Helper.GetRandomValue(5000))
+                    foreach(var item in Helper.GetRandomValue(5000))
                     {
                         lines++;
                         sb.AppendLine(item);
@@ -155,7 +165,6 @@ namespace BigSort.ViewModel
                             sb.Clear();
                             lines = 0;
                         }
-                        
                     }
 
                     if(sb.Length > 0)
@@ -170,24 +179,23 @@ namespace BigSort.ViewModel
                         Debug.WriteLine("size:" + newSize);
                         oldSize = newSize;
                     }
-                    
                 }
             }
 
             sw.Stop();
 
-            if (!GetFreeSize(path))
+            if(!GetFreeSize(path))
             {
                 MessageBox.Show("Disk if full :(");
             }
 
             MessageBox.Show("File ready - size is: " + GeteFileSize(path));
-            Debug.WriteLine("GenerateFile - Stop; Total:"+sw.Elapsed);
+            Debug.WriteLine("GenerateFile - Stop; Total:" + sw.Elapsed);
         }
 
-        public async Task SortFile(string path)
+        public async Task SortFile()
         {
-            Sort(@"d:\sorted.txt", @"d:\3gb.txt");
+            Sort(ResultFilePath, FilePath);
         }
 
         public void Sort(string sortedPath, string dataPath)
@@ -203,7 +211,10 @@ namespace BigSort.ViewModel
         {
             return (x, i) =>
             {
-                if (i % 100000 == 0) Debug.WriteLine("{0}: {1}", type, i);
+                if(i%100000 == 0)
+                {
+                    Debug.WriteLine("{0}: {1}", type, i);
+                }
                 return x;
             };
         }

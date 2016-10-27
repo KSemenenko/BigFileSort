@@ -26,7 +26,7 @@ namespace DirtyMergeSort
                         if(!x.Lines.MoveNext())
                         {
                             File.Delete(x.File);
-                            Debug.WriteLine("Deleted file {0}", x.File);
+                            Debug.WriteLine(string.Format("Deleted file {0}", x.File));
                             return false;
                         }
                     }
@@ -44,7 +44,7 @@ namespace DirtyMergeSort
                 {
                     var temp = Path.GetTempFileName();
                     File.WriteAllLines(temp, batch.Where(w => w.Length > 1).OrderBy(x => x.Trim().Split('.')[1]).ThenBy(x => x.Trim().Split('.')[0]));
-                    Debug.WriteLine("Wrote file {0}", temp);
+                    Debug.WriteLine(string.Format("Wrote file {0}", temp));
                     return temp;
                 });
         }
