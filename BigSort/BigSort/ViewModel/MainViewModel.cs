@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.OleDb;
 using System.Diagnostics;
@@ -8,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using BigSort.Model;
 using MVVMBase;
 
 namespace BigSort.ViewModel
@@ -86,9 +88,10 @@ namespace BigSort.ViewModel
         {
             get
             {
-                return new DelegateCommand(executedParam =>
+                return new DelegateCommand(async executedParam =>
                 {
-                    // Do something
+                    string path = "d:\\WriteLines.txt";
+                    await SortFile(path);
                 },
                 canExecutedParam => { return !string.IsNullOrEmpty(FilePath); });
             }
@@ -117,16 +120,32 @@ namespace BigSort.ViewModel
             sw.Start();
             int oldSize = -1;
             Progress = 0;
-            int localFilesite = FileSize*1024*1024;
             using (StreamWriter outputFile = new StreamWriter(path))
             {
                 while (GetFreeSize(path) && GeteFileSize(path) < FileSize)
                 {
-                    Progress = localFilesite * GeteFileSizeMB(path) / 100;
+                    Progress = (FileSize * 1024)  * GeteFileSizeMB(path) / 100;
 
-                    foreach (var item in Helper.WordsDictionary)
+                    StringBuilder sb = new StringBuilder();
+                    int lines = 0;
+                    foreach (var item in Helper.GetRandomValue(5000))
                     {
-                        await outputFile.WriteLineAsync(item.Key + "." + item.Value);
+                        lines++;
+                        sb.AppendLine(item);
+
+                        if(lines > 1000)
+                        {
+                            await outputFile.WriteLineAsync(sb.ToString());
+                            sb.Clear();
+                            lines = 0;
+                        }
+                        
+                    }
+
+                    if(sb.Length > 0)
+                    {
+                        await outputFile.WriteLineAsync(sb.ToString());
+                        sb.Clear();
                     }
 
                     var newSize = GeteFileSize(path);
@@ -148,6 +167,61 @@ namespace BigSort.ViewModel
 
             MessageBox.Show("File ready - size is: " + GeteFileSize(path));
             Debug.WriteLine("GenerateFile - Stop; Total:"+sw.Elapsed);
+        }
+
+        public async Task SortFile(string path)
+        {
+            Debug.WriteLine("GenerateFile - Start");
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            Progress = 0;
+            ConcurrentDictionary<string, ConcurrentQueue<LineItem>> indexDictionary = new ConcurrentDictionary<string, ConcurrentQueue<LineItem>>();
+
+    
+            //create index
+            Parallel.ForEach(File.ReadLines(path), (line, loopState, index) =>
+            {
+                if(index > 630)
+                {
+                    var x = 5;
+                }
+
+                var lineParts = line.Split('.');
+                if (lineParts.Length != 2)
+                {
+                    return;
+                }
+                string key = string.Empty;
+                int digit = 0;
+
+                try
+                {
+                    key = lineParts[1].Trim().ToLowerInvariant();
+                    digit = Convert.ToInt32(lineParts[0].Trim());
+                }
+                catch (Exception)
+                {
+                    return;
+                }
+
+
+                var indexList = indexDictionary.GetOrAdd(key, new ConcurrentQueue<LineItem>());
+
+                var lineItem = new LineItem() { LineNumeber = index, Number = digit };
+                indexList.Enqueue(lineItem);
+
+            });
+
+
+            sw.Stop();
+
+            if (!GetFreeSize(path))
+            {
+                MessageBox.Show("Disk if full :(");
+            }
+
+            MessageBox.Show("File ready - size is: " + GeteFileSize(path));
+            Debug.WriteLine("GenerateFile - Stop; Total:" + sw.Elapsed);
         }
     }
 }

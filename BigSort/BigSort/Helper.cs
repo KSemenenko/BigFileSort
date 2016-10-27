@@ -29,7 +29,16 @@ namespace BigSort
 
         }
 
-        public static Dictionary<int, string> WordsDictionary; 
+        public static Dictionary<int, string> WordsDictionary;
+
+        public static IEnumerable<string> GetRandomValue(int count)
+        {
+            Random rnd = new Random(DateTime.Now.Millisecond);
+            for(int i = 0; i < count; i++)
+            {
+                yield return string.Format("{0}.{1}", rnd.Next(0, WordsDictionary.Count * 2), WordsDictionary[rnd.Next(1, WordsDictionary.Count-1)]);
+            }
+        } 
 
     }
 }
