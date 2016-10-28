@@ -111,6 +111,7 @@ namespace BigSort.ViewModel
                 return new DelegateCommand(async executedParam =>
                 {
                     await SortFile();
+                    MessageBox.Show("Sort ready");
                 },
                     canExecutedParam => { return !string.IsNullOrEmpty(ResultFilePath); });
             }

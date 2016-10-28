@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -43,7 +44,7 @@ namespace DirtyMergeSort
                 .Select(batch =>
                 {
                     var temp = Path.GetTempFileName();
-                    File.WriteAllLines(temp, batch.Where(w => w.Length > 1).OrderBy(x => x.Trim().Split('.')[1]).ThenBy(x => x.Trim().Split('.')[0]));
+                    File.WriteAllLines(temp, batch.Where(w => w.Length > 1).OrderBy(x => x.Trim().Split('.')[1]).ThenBy(x => Convert.ToInt32(x.Trim().Split('.')[0])));
                     Debug.WriteLine(string.Format("Wrote file {0}", temp));
                     return temp;
                 });
